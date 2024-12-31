@@ -1,0 +1,68 @@
+name: build-rockchip-immortalWrt
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: |
+          输入 软路由型号（用逗号分隔的多个值），可选值如下：
+          ,cudy_tr3000
+ 
+        required: true
+        default: 'cudy_tr3000'
+      rootfs_partsize:
+        description: '设置软件包大小 单位(MB)'
+        required: true
+        default: '1024'
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set executable permissions
+        run: chmod +x ${{ github.workspace }}/mediatek-filogic/build.sh
+
+      - name: Building mediatek-filogic ImmortalWrt
+        run: |
+          profiles="${{ github.event.inputs.profile }}"
+          rootfs_partsize="${{ github.event.inputs.rootfs_partsize }}"
+          
+          IFS=',' read -r -a profile_array <<< "$profiles"
+          
+          for profile in "${profile_array[@]}"; do
+            echo "Building for profile: $profile"
+            
+            docker run --rm -i \
+              --user root \
+              -v "${{ github.workspace }}/bin:/home/build/immortalwrt/bin" \
+              -v "${{ github.workspace }}/files:/home/build/immortalwrt/files" \
+              -v "${{ github.workspace }}/mediatek-filogic/imm.config:/home/build/immortalwrt/.config" \
+              -v "${{ github.workspace }}/mediatek-filogic/build.sh:/home/build/immortalwrt/build.sh" \
+              -e PROFILE=$profile \
+              -e ROOTFS_PARTSIZE=$rootfs_partsize \
+              immortalwrt/imagebuilder:mediatek-filogic-armv8-openwrt-24.10.0-rc3 /bin/bash /home/build/immortalwrt/build.sh
+          done
+
+      - name: Create GitHub Release Info
+        uses: softprops/action-gh-release@v2.1.0
+        with:
+          tag_name: Autobuild
+          name: ImmortWrt-mediatek-filogic
+          body_path: ${{ github.workspace }}/info.md
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload ImmortWrt as release assets
+        uses: softprops/action-gh-release@v2.1.0
+        with:
+          tag_name: Autobuild
+          files: ${{ github.workspace }}/bin/targets/mediatek-filogic/armv8/*.img.gz
+          token: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
