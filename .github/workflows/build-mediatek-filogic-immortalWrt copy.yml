@@ -1,4 +1,4 @@
-name: build-rockchip-immortalWrt
+name: build-mediatek-filogic-immortalWrt
 
 on:
   workflow_dispatch:
